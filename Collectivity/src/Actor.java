@@ -10,11 +10,9 @@ public abstract class Actor {
 	
 	private int id;
 
-	public Actor(int id) {
-		do {
-			x = (Math.random() - 0.5) * World.WORLD_RAD * 2;
-			y = (Math.random() - 0.5) * World.WORLD_RAD * 2;
-		} while (new Point2D(x, y).magnitude() > World.WORLD_RAD);
+	public Actor(double x, double y, int id) {
+		this.x = x;
+		this.y = y;
 		
 		this.id = id;
 	}
@@ -25,7 +23,7 @@ public abstract class Actor {
 	
 	public Point2D getUnitVector(Point2D other) { return other.subtract(getPoint()).normalize(); }
 
-	abstract public void draw(GraphicsContext gc, int xoff, int yoff, double scale);
+	abstract public void draw(GraphicsContext gc, double scale);
 
-	abstract public void tick(List<Actor> actors);
+	abstract public void tick();
 }

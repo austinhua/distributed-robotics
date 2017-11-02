@@ -10,6 +10,9 @@ public class Environment {
 	boolean goal = false;
 	Point2D centroid, startPt, turnPt, goalPt;
 	
+	boolean printed = false;
+	double[][] stats = new double[20][3];
+	
 	public Environment(List<Robot> robots, Point2D startPt) {
 		this.robots = robots;
 		this.startPt = startPt;
@@ -17,6 +20,35 @@ public class Environment {
 		this.goalPt = turnPt.add(0, 200);
 		updateCentroid();
 	}
+	
+	public void collectStats(int seconds) {
+		int time_step = 50;
+		if (seconds % time_step != 0 || seconds/time_step >= stats.length) return;
+		int index = seconds/time_step;
+		stats[index][0] = seconds;
+		
+		// calculate average robot dist
+		double robotAvg = 0;
+		for (Robot r : robots) {
+			robotAvg += centroid.distance(r.getPoint());
+		}
+		robotAvg /= robots.size();
+		stats[index][1] = robotAvg;
+		
+		// calculate average centroid dist
+		double centroidDist = centroid.distance(this.getClosestPathPt(centroid));
+		stats[index][2] = centroidDist;
+		
+		if (goal && !printed) {
+			printed = true;
+			for (int i = 0; i < stats.length; i++) {
+				System.out.println("Time: " + stats[i][0] + ",\tAvg Robot Dist: " + stats[i][1] + ",\tAvg Centroid Dist: " + stats[i][2]);
+//				System.out.printf("Time: %d,\tAvg Robot Dist: %d\t,Avg Centroid Dist: %d", stats[i][0], stats[i][1], stats[i][2]);
+			}
+		}
+	}
+	
+	public List<Robot> getRobots() { return robots; }
 	
 	public void updateCentroid() {
 		Point2D sum = new Point2D(0, 0);

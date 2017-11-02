@@ -2,6 +2,7 @@ import java.util.*;
 
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
+import javafx.geometry.Point2D;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
@@ -10,23 +11,23 @@ import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 
 public class World extends Application {
-	public static final int numRobots = 3;
-	public static final int numTargets = 6;
-	public static final double WORLD_RAD = 100;
+	public static final int numRobots = 25;
+	public static final double WORLD_SIZE = 300;
+	static final Point2D startPt = new Point2D(WORLD_SIZE/2 - 100, WORLD_SIZE/2 - 100);
 	
+	public static final int SCREEN_LEN = 800;
 	public static final int ACCEL = 1;
-	public static final int FPS = 10; // ticks per second
-	public static final int SCREEN_LEN = 500;
+	public static final int FPS = 50; // ticks per second
 	
 	boolean started = false;
 	long lastTime = 0;
 	AnimationTimer timer = null;
 	GraphicsContext gc = null;
 	int seconds = 0;
-	int[] targetsObserved = new int[120];
 	
 	List<Actor> actors = new ArrayList<Actor>();
-	int[][] obsMatrix = new int[numRobots][numTargets];
+	List<Robot> robots = new ArrayList<Robot>();
+	Environment env;
 
 	public static void main(String[] args) {
 		launch(args);
@@ -36,7 +37,7 @@ public class World extends Application {
 	public void start(Stage primaryStage) {
 		init();
 		
-		primaryStage.setTitle("Assignment 1");
+		primaryStage.setTitle("Assignment 2: Collectivity");
 		Group root = new Group();
 		Canvas canvas = new Canvas(SCREEN_LEN, SCREEN_LEN);
 		gc = canvas.getGraphicsContext2D();
@@ -51,11 +52,13 @@ public class World extends Application {
 			return;
 		started = true;
 		
-		for (int i = 0; i < numRobots; i++)
-			actors.add(new Robot(i, obsMatrix));
-
-		for (int i = 0; i < numTargets; i++)
-			actors.add(new Target(i));
+		env = new Environment(robots, startPt);
+		for (int i = 0; i < numRobots; i++) {
+			Point2D robotStartPt = generateStartPt(startPt, 50);
+			Robot r = new Robot(robotStartPt.getX(), robotStartPt.getY(), i, env);
+			robots.add(r);
+			actors.add(r);
+		}
 
 		timer = new AnimationTimer() {
 			public void handle(long now) {
@@ -63,26 +66,6 @@ public class World extends Application {
 					lastTime = now;
 					updateAll();
 					drawAll();
-					
-					// count the number of targets observed in a given moment
-					if (seconds < 120) {
-						int totalObserved = 0;
-						for (int j = 0; j < obsMatrix[0].length; j++) {
-							boolean observed = false;
-							for (int i = 0; i < obsMatrix.length; i++) {
-								if (obsMatrix[i][j] == 1) observed = true;
-							}
-							if (observed) totalObserved++;
-						}
-						targetsObserved[seconds] = totalObserved;
-					}
-					
-					// average proportion of targets observed over 120 seconds
-					if (seconds == 120) {
-						int sum = 0;
-						for(int i : targetsObserved) sum += i;
-						System.out.println(sum/120./numTargets);
-					}
 					
 					seconds++;
 				}
@@ -92,38 +75,47 @@ public class World extends Application {
 	}
 
 	public void updateAll() {
-		buildObsMatrix();
+		env.updateCentroid();
 		for (Actor a : actors)
-			a.tick(actors);
+			a.tick();
+		env.collectStats(seconds);
 	}
 	
-	public void buildObsMatrix() {
-		for (Actor a_r : actors) {
-			if (a_r instanceof Robot) {
-				for (Actor a_t : actors) {
-					if (a_t instanceof Target) {
-						if(a_r.getPoint().distance(a_t.getPoint()) <= Robot.DO3) {
-							obsMatrix[a_r.getId()][a_t.getId()] = 1;
-						}
-						else {
-							obsMatrix[a_r.getId()][a_t.getId()] = 0;
-						}
-					}
-				}
-			}
-		}
+	public Point2D generateStartPt(Point2D startPt, double rad) {
+		Point2D p;
+		do {
+			p = startPt.add( (Math.random()-.5) * rad, (Math.random()-.5) * rad);
+		} while (startPt.distance(p) > rad);
+		return p;
 	}
 
 	public void drawAll() {
 		if (gc == null)
 			return;
 
+		double scale = SCREEN_LEN / WORLD_SIZE;
+		
 		gc.setFill(Color.WHITE);
 		gc.fillRect(0, 0, SCREEN_LEN, SCREEN_LEN);
 		
-		gc.strokeOval(0, 0, SCREEN_LEN, SCREEN_LEN);
+		// draw start, turn, and goal pts
+		double rad = 3 * scale;
+		double lineDist = 200 * scale;
+		double startX = startPt.getX() * scale;
+		double startY = startPt.getY() * scale;
+		
+		gc.setFill(Color.BLACK);
+		gc.strokeLine(startX, startY, startX + lineDist, startY);
+		gc.strokeLine(startX + lineDist, startY, startX + lineDist, startY + lineDist);
+		gc.fillOval(startX - rad, startY - rad, 2*rad, 2*rad);
+		gc.fillOval(startX - rad + lineDist, startY - rad, 2*rad, 2*rad);
+		gc.fillOval(startX - rad + lineDist, startY - rad + lineDist, 2*rad, 2*rad);
+
+		// draw centroid
+		gc.setFill(Color.YELLOW);
+		gc.fillOval(env.getCentroid().getX() * scale - rad, env.getCentroid().getY() * scale - rad, 2*rad, 2*rad);
 		
 		for (Actor a : actors)
-			a.draw(gc, SCREEN_LEN / 2, SCREEN_LEN / 2, SCREEN_LEN / (WORLD_RAD * 2));
+			a.draw(gc, scale);
 	}
 }
